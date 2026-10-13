@@ -121,3 +121,15 @@ export interface PluginConstructor<T extends IPlugin = IPlugin> {
   /** 插件默认配置，可在 `editor.use(Plugin, { ... })` 时被覆盖 */
   options?: PluginOptions;
 }
+
+/**
+ * 「登记一个插件」的两种写法，供 `EditorCanvas` 这类宿主组件声明插件清单：
+ *
+ * ```ts
+ * const plugins: PluginUse[] = [
+ *   MyCustomObjectPlugin,                    // 用插件默认配置
+ *   [EditorStorePlugin, { store }],          // 额外注入配置（例如 Pinia store）
+ * ];
+ * ```
+ */
+export type PluginUse = PluginConstructor | [PluginConstructor, PluginOptions?];

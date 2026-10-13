@@ -11,6 +11,7 @@ export type {
   ObjectTypeMap,
   PluginConstructor,
   PluginOptions,
+  PluginUse,
   RegisteredObject,
   RegisteredTypeName,
   SelectionMode,

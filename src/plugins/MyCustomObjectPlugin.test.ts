@@ -1,7 +1,9 @@
+import { classRegistry } from "fabric";
 import { describe, expect, it } from "vite-plus/test";
 import { Editor } from "../core/Editor";
 import { asCanvas, MockCanvas } from "../test/MockCanvas";
-import MyCustomObjectPlugin, { MyCustomObject } from "./MyCustomObjectPlugin";
+import { MyCustomObject, registerCustomObjects } from "../objects";
+import MyCustomObjectPlugin from "./MyCustomObjectPlugin";
 
 function createEditor(options?: { defaultCustomProp?: string }): {
   editor: Editor;
@@ -108,5 +110,19 @@ describe("MyCustomObjectPlugin", () => {
     plugin.hookImportAfter();
 
     expect(object.customProp).toBe("hello fabric");
+  });
+});
+
+describe("registerCustomObjects", () => {
+  it("把 objects/ 里登记的对象同步进 registry 与 fabric classRegistry", () => {
+    const canvas = new MockCanvas();
+    const editor = new Editor(asCanvas(canvas));
+
+    registerCustomObjects(editor.registry);
+
+    expect(editor.registry.registeredTypes).toEqual(["MyCustomObject"]);
+    expect(editor.registry.resolve("MyCustomObject")).toBe(MyCustomObject);
+    // 反序列化要靠 classRegistry 按 type 找回类，这一步不能漏
+    expect(classRegistry.has("MyCustomObject")).toBe(true);
   });
 });

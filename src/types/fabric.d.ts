@@ -5,16 +5,18 @@
  * 声明过的类型名返回精确类型（`registry.create("Rect") as Rect`），
  * 没声明的回退成 `FabricObject`。
  *
- * 自定义对象请在**各自的插件文件里**做增强，就近维护，例如：
- * `src/plugins/MyCustomObjectPlugin.ts`
+ * 自定义对象请在**对象自己的文件里**做增强（`src/objects/*.ts`），就近维护，例如：
+ * `src/objects/MyCustomObject.ts`
  *
  * ```ts
- * declare module "../../core/types" {
+ * declare module "../core/types" {
  *   interface ObjectTypeMap {
  *     MyCustomObject: MyCustomObject;
  *   }
  * }
  * ```
+ *
+ * 这里只负责 fabric 内置对象；自定义对象一律不写在这个文件里。
  */
 import type {
   Circle,

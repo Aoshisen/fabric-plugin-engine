@@ -1,82 +1,11 @@
-import { FabricObject } from "fabric";
-import type { FabricObjectProps } from "fabric";
 import { BasePlugin } from "./BasePlugin";
+import { registerCustomObjects } from "../objects";
+import { MyCustomObject } from "../objects";
+import type { MyCustomObjectOptions, MyCustomObjectProps } from "../objects";
 import type { PluginOptions } from "../core/types";
 
 /* -------------------------------------------------------------------------- */
-/* 1. 自定义对象                                                               */
-/* -------------------------------------------------------------------------- */
-
-/** `MyCustomObject` 的自定义数据字段（参与序列化） */
-export interface MyCustomObjectProps {
-  customProp?: string;
-}
-
-/** 构造 `MyCustomObject` 时允许传入的选项 */
-export type MyCustomObjectOptions = Partial<FabricObjectProps> & MyCustomObjectProps;
-
-/**
- * 示例自定义对象。
- *
- * 三件必须做的事：
- * 1. `static override type`  —— 反序列化时按这个 `type` 找类，务必全局唯一；
- * 2. `static override customProperties` —— 声明哪些字段要写进 JSON；
- * 3. 在插件 `init()` 里调 `registry.registerType()` —— 把类登记进 `classRegistry`。
- */
-export class MyCustomObject extends FabricObject {
-  static override type = "MyCustomObject";
-
-  /** 参与序列化的自定义字段（fabric 的 toObject() 会自动合并这个列表） */
-  static override customProperties = ["customProp"];
-
-  /**
-   * 用 `declare`（纯类型声明）而不是 `customProp = ""`。
-   *
-   * fabric 在**基类构造函数**里就会 `setOptions(options)`，而子类的字段初始化发生在
-   * `super()` 返回之后 —— 写成字段初始化会把构造时传入的值覆盖掉。
-   * 所以默认值放到构造函数体里用 `??=` 兜底。
-   */
-  declare customProp: string;
-
-  constructor(options: MyCustomObjectOptions = {}) {
-    super(options);
-    this.customProp ??= "";
-  }
-
-  /**
-   * 绘制：圆角矩形 + 居中文字。
-   *
-   * 基类的 `_render` 是空实现（`_render(_ctx) {}`），不覆写就什么都看不见。
-   * 注意这里没写 `override`：fabric 的 `.d.ts` 里没有把 `_render` 导出到基类类型上。
-   */
-  _render(ctx: CanvasRenderingContext2D): void {
-    const { width, height } = this;
-    const radius = Math.min(8, height / 2);
-
-    ctx.save();
-    ctx.beginPath();
-    if (typeof ctx.roundRect === "function") {
-      ctx.roundRect(-width / 2, -height / 2, width, height, radius);
-    } else {
-      ctx.rect(-width / 2, -height / 2, width, height);
-    }
-    ctx.fillStyle = typeof this.fill === "string" ? this.fill : "#ff9f43";
-    ctx.fill();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(15, 23, 42, 0.35)";
-    ctx.stroke();
-
-    ctx.fillStyle = "#1f2937";
-    ctx.font = "13px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(this.customProp, 0, 0, Math.max(width - 12, 0));
-    ctx.restore();
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/* 2. 插件                                                                     */
+/* 插件                                                                        */
 /* -------------------------------------------------------------------------- */
 
 /** 插件配置 */
@@ -86,7 +15,10 @@ export interface MyCustomObjectPluginOptions extends PluginOptions {
 }
 
 /**
- * 示例插件：演示「自定义对象注册 + 插件 API 代理 + 导入导出钩子」三件事。
+ * 示例插件：演示「自定义对象登记 + 插件 API 代理 + 导入导出钩子」三件事。
+ *
+ * 注意自定义对象本身**不在这个文件里**了，统一放在 `src/objects/` 下。
+ * 插件只负责「把它登记进当前 Editor」以及暴露业务 API。
  *
  * - `static apis` 里声明的方法会被代理到 Editor 上，业务侧直接 `editor.createMyObject()`
  * - `static events` 只是声明本插件会派发的事件，方便调试时排查
@@ -103,9 +35,9 @@ export default class MyCustomObjectPlugin extends BasePlugin {
   }
 
   init(): void {
-    // 注册自定义对象：内部会同步写进 fabric 的 classRegistry，
+    // 登记本项目所有自定义对象：内部会同步写进 fabric 的 classRegistry，
     // 这样 loadFromJSON 反序列化时才找得到类
-    this.editor.registry.registerType("MyCustomObject", MyCustomObject);
+    registerCustomObjects(this.editor.registry);
   }
 
   /* ---------------------------- 对外的插件 API ---------------------------- */
@@ -135,7 +67,7 @@ export default class MyCustomObjectPlugin extends BasePlugin {
   /* ----------------------------- 导入导出钩子 ----------------------------- */
 
   /** 导入前：把历史版本里的 `label` 字段迁移成 `customProp` */
-  hookImportBefore(json: string): string {
+  override hookImportBefore(json: string): string {
     const data = JSON.parse(json) as { objects?: Record<string, unknown>[] };
 
     for (const object of data.objects ?? []) {
@@ -161,17 +93,13 @@ export default class MyCustomObjectPlugin extends BasePlugin {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 3. 类型增强：让核心层认识这个插件                                          */
+/* 类型增强：让核心层认识这个插件                                              */
 /* -------------------------------------------------------------------------- */
 
 declare module "../core/types" {
   interface CoreEvents {
     /** MyCustomObjectPlugin 派发的自定义事件 */
     "myPlugin:change": { payload: MyCustomObject };
-  }
-
-  interface ObjectTypeMap {
-    MyCustomObject: MyCustomObject;
   }
 }
 

@@ -2,7 +2,7 @@ import { Rect } from "fabric";
 import { classRegistry } from "fabric";
 import { describe, expect, it } from "vite-plus/test";
 import { ObjectRegistry } from "./ObjectRegistry";
-import { MyCustomObject } from "../plugins/MyCustomObjectPlugin";
+import { MyCustomObject } from "../objects";
 
 describe("ObjectRegistry", () => {
   it("能创建 fabric 内置对象（模块加载时已自动登记）", () => {

@@ -1,47 +1,41 @@
 <script setup lang="ts">
-import { ref, shallowRef } from "vue";
+import { shallowRef } from "vue";
+import { storeToRefs } from "pinia";
 import EditorCanvas from "./components/EditorCanvas.vue";
-import MyCustomObjectPlugin, { MyCustomObject } from "./plugins/MyCustomObjectPlugin";
-import type { Editor, PluginConstructor } from "./core";
+import MyCustomObjectPlugin from "./plugins/MyCustomObjectPlugin";
+import EditorStorePlugin from "./plugins/EditorStorePlugin";
+import { MyCustomObject } from "./objects";
+import { useEditorStore } from "./stores";
+import type { Editor, PluginUse } from "./core";
+
+/**
+ * UI 状态的唯一来源。
+ * `EditorStorePlugin` 负责把 Editor 的事件写进来，组件只读不写。
+ */
+const store = useEditorStore();
+const { objectCount, selectionLabel, selected, installedPlugins, lastEvent, syncCount } =
+  storeToRefs(store);
 
 /**
  * 插件在应用层显式登记：想在编辑器里用哪些能力，一眼可见。
- * 后续新增插件（快捷键、历史记录、对齐吸附...）只需要往这个数组里加一项。
+ * 注意 `EditorStorePlugin` 是 `[类, 选项]` 的写法 —— 它需要拿到 store 实例。
  */
-const plugins: PluginConstructor[] = [MyCustomObjectPlugin];
+const plugins: PluginUse[] = [MyCustomObjectPlugin, [EditorStorePlugin, { store }]];
 
 const editor = shallowRef<Editor | null>(null);
-const objectCount = ref(0);
-const selectionText = ref("未选中");
-const snapshot = ref("");
+const snapshot = shallowRef("");
 
-function syncStatus(): void {
-  objectCount.value = editor.value?.canvas.getObjects().length ?? 0;
-}
-
-/** EditorCanvas 挂载完成：拿到 editor 后在这里做全局订阅 */
 function handleReady(instance: Editor): void {
   editor.value = instance;
-  syncStatus();
-
-  instance.on("object:added", syncStatus);
-  instance.on("object:removed", syncStatus);
-  instance.on("selection:changed", ({ mode, targets }) => {
-    if (mode === "empty") {
-      selectionText.value = "未选中";
-      return;
-    }
-    selectionText.value = `${mode === "one" ? "单选" : "多选"} ${targets.length} 个对象`;
-  });
 }
 
-/** 演示「fabric 内置对象」：走统一的 registry 入口 */
+/** 添加 fabric 内置对象：走统一的 registry 入口 */
 function addRect(): void {
   const instance = editor.value;
   if (!instance) return;
 
   const rect = instance.registry.create("Rect", {
-    left: 80 + objectCount.value * 16,
+    left: 80 + (objectCount.value % 6) * 24,
     top: 80,
     width: 140,
     height: 90,
@@ -53,10 +47,9 @@ function addRect(): void {
   instance.canvas.add(rect);
   instance.canvas.setActiveObject(rect);
   instance.canvas.requestRenderAll();
-  syncStatus();
 }
 
-/** 演示「插件 API 代理」：类型由插件里的 declare module 补全 */
+/** 添加自定义对象：类型由 objects/ 里的声明 + 插件的 API 代理共同保证 */
 function addCustomObject(): void {
   const instance = editor.value;
   if (!instance) return;
@@ -72,17 +65,16 @@ function addCustomObject(): void {
 
   instance.canvas.setActiveObject(object);
   instance.canvas.requestRenderAll();
-  syncStatus();
 }
 
-/** 演示插件 API 的第二次调用：修改属性并广播 myPlugin:change */
+/** 修改选中对象：插件内部会广播 myPlugin:change */
 function renameSelected(): void {
   const instance = editor.value;
   if (!instance) return;
 
   const [target] = instance.canvas.getActiveObjects();
   if (!(target instanceof MyCustomObject)) {
-    selectionText.value = "请先选中一个自定义对象";
+    store.markEvent("请先选中一个自定义对象");
     return;
   }
 
@@ -96,12 +88,12 @@ function exportJSON(): void {
   snapshot.value = editor.value.exportJSON();
 }
 
+/** 导入后 UI 会自动刷新：靠插件的 hookImportAfter → hookImportAfter 重新同步 store */
 async function importJSON(): Promise<void> {
   const instance = editor.value;
   if (!instance || !snapshot.value) return;
 
   await instance.loadJSON(snapshot.value);
-  syncStatus();
 }
 
 function clearCanvas(): void {
@@ -111,7 +103,11 @@ function clearCanvas(): void {
   const objects = instance.canvas.getObjects();
   if (objects.length > 0) instance.canvas.remove(...objects);
   instance.canvas.requestRenderAll();
-  syncStatus();
+}
+
+/** 演示插件 API：手动强制同步（正常不用调，事件已经覆盖了） */
+function forceSync(): void {
+  editor.value?.syncEditorState();
 }
 </script>
 
@@ -120,7 +116,7 @@ function clearCanvas(): void {
     <header class="app__header">
       <div>
         <h1 class="app__title">Fabric Editor Base</h1>
-        <p class="app__subtitle">Editor + ObjectRegistry + Plugin 的最小可运行地基</p>
+        <p class="app__subtitle">Editor + ObjectRegistry + Plugin + Pinia 的最小可运行地基</p>
       </div>
 
       <dl class="app__stats">
@@ -130,7 +126,7 @@ function clearCanvas(): void {
         </div>
         <div>
           <dt>选择</dt>
-          <dd>{{ selectionText }}</dd>
+          <dd>{{ selectionLabel }}</dd>
         </div>
       </dl>
     </header>
@@ -147,6 +143,45 @@ function clearCanvas(): void {
 
     <section class="app__stage">
       <EditorCanvas :plugins="plugins" @ready="handleReady" />
+    </section>
+
+    <section class="app__panels">
+      <article class="app__panel">
+        <h2 class="app__panel-title">
+          选中对象
+          <span class="app__badge">{{ selected.length }}</span>
+        </h2>
+        <ul v-if="selected.length" class="app__list">
+          <li v-for="(item, index) in selected" :key="`${item.label}-${index}`">
+            <span class="app__tag">{{ item.type }}</span>
+            <span class="app__list-text">{{ item.label }}</span>
+          </li>
+        </ul>
+        <p v-else class="app__empty">未选中任何对象</p>
+      </article>
+
+      <article class="app__panel">
+        <h2 class="app__panel-title">
+          已装载插件
+          <span class="app__badge">{{ installedPlugins.length }}</span>
+        </h2>
+        <ul class="app__list">
+          <li v-for="name in installedPlugins" :key="name">
+            <span class="app__list-text">{{ name }}</span>
+          </li>
+        </ul>
+      </article>
+
+      <article class="app__panel">
+        <h2 class="app__panel-title">Store 同步</h2>
+        <p class="app__empty">
+          最近事件：<code>{{ lastEvent ?? "—" }}</code>
+        </p>
+        <p class="app__empty">
+          同步次数：<code>{{ syncCount }}</code>
+        </p>
+        <button type="button" class="app__mini-btn" @click="forceSync">手动强制同步</button>
+      </article>
     </section>
 
     <section v-if="snapshot" class="app__snapshot">
@@ -260,6 +295,100 @@ function clearCanvas(): void {
   padding: 24px;
   border-radius: 12px;
   background: var(--stage);
+}
+
+.app__panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.app__panel {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.app__panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.app__badge {
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 999px;
+  background: var(--stage);
+  color: var(--text-muted);
+}
+
+.app__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app__list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app__tag {
+  flex: none;
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 4px;
+  background: rgb(79 124 255 / 12%);
+  color: var(--accent);
+}
+
+.app__list-text {
+  font-size: 12px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app__empty {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.app__empty code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--stage);
+  color: var(--text-strong);
+}
+
+.app__mini-btn {
+  margin-top: 4px;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.app__mini-btn:hover {
+  border-color: var(--accent);
 }
 
 .app__snapshot {

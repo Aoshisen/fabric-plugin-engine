@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { Editor } from "../core";
-import type { PluginConstructor } from "../core";
+import type { PluginUse } from "../core";
 
 /**
  * 画布宿主组件。
@@ -15,8 +15,12 @@ const props = withDefaults(
     width?: number;
     height?: number;
     backgroundColor?: string;
-    /** 需要装载的插件，按数组顺序装载 */
-    plugins?: PluginConstructor[];
+    /**
+     * 需要装载的插件，按数组顺序装载。
+     * 直接给类表示用默认配置；写成 `[类, 选项]` 可以往插件里注入依赖
+     * （例如把 Pinia store 交给 `EditorStorePlugin`）。
+     */
+    plugins?: PluginUse[];
   }>(),
   {
     width: 960,
@@ -45,8 +49,9 @@ onMounted(() => {
     preserveObjectStacking: true,
   });
 
-  for (const Plugin of props.plugins) {
-    instance.use(Plugin);
+  for (const entry of props.plugins) {
+    if (Array.isArray(entry)) instance.use(entry[0], entry[1] ?? {});
+    else instance.use(entry);
   }
 
   editor.value = instance;

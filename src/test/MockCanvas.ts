@@ -5,8 +5,8 @@ type Listener = (payload: unknown) => void;
 /**
  * fabric `Canvas` 的测试替身。
  *
- * 核心层只用到 canvas 的一小块能力（事件绑定、对象增删、重绘、序列化、销毁），
- * 单测里没必要真的起一个浏览器画布环境，所以在 Node 下用这个替身。
+ * 覆盖核心层与插件层实际用到的那部分能力：事件绑定、对象增删、选中状态、
+ * 重绘、序列化、销毁。单测里没必要真的起一个浏览器画布环境，所以在 Node 下用这个替身。
  * 需要交给 `new Editor()` 时套一层 `asCanvas()`。
  *
  * 之所以不把 `ICanvasLike` 铺到核心层：`Editor.canvas` 的公开契约就是真实的
@@ -20,6 +20,7 @@ export class MockCanvas {
   /** 是否已被 `dispose()` */
   disposed = false;
 
+  private active: FabricObject[] = [];
   private readonly listeners = new Map<string, Set<Listener>>();
 
   /** 返回解绑函数，行为与 fabric `Observable.on()` 保持一致 */
@@ -65,6 +66,30 @@ export class MockCanvas {
     return [...this.objects];
   }
 
+  /** 当前选中的对象，与 fabric 的 `getActiveObjects()` 一致 */
+  getActiveObjects(): FabricObject[] {
+    return [...this.active];
+  }
+
+  /**
+   * 选中对象。
+   * 与 fabric 保持一致：原本没有选中 → `selection:created`；替换选中 → `selection:updated`。
+   */
+  setActiveObject(object: FabricObject): boolean {
+    const first = this.active.length === 0;
+    this.active = [object];
+    this.fire(first ? "selection:created" : "selection:updated", { selected: [...this.active] });
+    return true;
+  }
+
+  /** 取消选中，派发 `selection:cleared` */
+  discardActiveObject(): boolean {
+    const previous = this.active;
+    this.active = [];
+    this.fire("selection:cleared", { deselected: previous, selected: [] });
+    return true;
+  }
+
   requestRenderAll(): void {
     // no-op：测试环境不需要真的重绘
   }
@@ -75,6 +100,14 @@ export class MockCanvas {
 
   async loadFromJSON(json: unknown): Promise<this> {
     this.loadedJSON = json;
+
+    // 真实 fabric 会用 JSON 内容整体替换画布对象（并且不一定逐个派发 object:added），
+    // 这里如实模拟一下替换行为，方便测「导入后需要重新同步」这条路径。
+    const data = json as { objects?: FabricObject[] } | null;
+    if (data && Array.isArray(data.objects)) {
+      this.objects.splice(0, this.objects.length, ...data.objects);
+    }
+
     return this;
   }
 
