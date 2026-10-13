@@ -2,7 +2,6 @@
 import { shallowRef } from "vue";
 import { storeToRefs } from "pinia";
 import EditorCanvas from "./components/EditorCanvas.vue";
-import MyCustomObjectPlugin from "./plugins/MyCustomObjectPlugin";
 import EditorStorePlugin from "./plugins/EditorStorePlugin";
 import { MyCustomObject } from "./objects";
 import { useEditorStore } from "./stores";
@@ -20,7 +19,7 @@ const { objectCount, selectionLabel, selected, installedPlugins, lastEvent, sync
  * 插件在应用层显式登记：想在编辑器里用哪些能力，一眼可见。
  * 注意 `EditorStorePlugin` 是 `[类, 选项]` 的写法 —— 它需要拿到 store 实例。
  */
-const plugins: PluginUse[] = [MyCustomObjectPlugin, [EditorStorePlugin, { store }]];
+const plugins: PluginUse[] = [[EditorStorePlugin, { store }]];
 
 const editor = shallowRef<Editor | null>(null);
 const snapshot = shallowRef("");
