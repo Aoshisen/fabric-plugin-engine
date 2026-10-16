@@ -160,7 +160,7 @@ describe("EditorStorePlugin", () => {
     const { editor, canvas, store } = createEditor();
     canvas.add(new Rect({ width: 10, height: 10 }));
 
-    editor.destroy();
+    editor.dispose();
 
     expect(store.objectCount).toBe(0);
     expect(store.installedPlugins).toEqual([]);
@@ -176,7 +176,7 @@ describe("EditorStorePlugin", () => {
     const { editor, canvas, store } = createEditor({ resetOnDestroy: false });
     canvas.add(new Rect({ width: 10, height: 10 }));
 
-    editor.destroy();
+    editor.dispose();
 
     expect(store.objectCount).toBe(1);
   });

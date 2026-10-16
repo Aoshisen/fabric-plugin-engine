@@ -59,7 +59,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  editor.value?.destroy();
+  editor.value?.dispose();
   editor.value = null;
   emit("disposed");
 });

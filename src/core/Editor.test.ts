@@ -180,7 +180,7 @@ describe("Editor", () => {
       events.push(String(destroyed === editor.canvas)),
     );
 
-    editor.destroy();
+    editor.dispose();
 
     expect(plugin?.destroyCalls).toBe(1);
     expect(editor.isDestroyed).toBe(true);
@@ -196,8 +196,8 @@ describe("Editor", () => {
     editor.use(TestPlugin);
     const plugin = editor.getPlugin<TestPlugin>("TestPlugin");
 
-    editor.destroy();
-    editor.destroy();
+    editor.dispose();
+    editor.dispose();
 
     expect(plugin?.destroyCalls).toBe(1);
   });
@@ -214,5 +214,84 @@ describe("Editor", () => {
 
     expect(canvas.loadedJSON).toMatchObject({ migrated: true });
     expect(plugin.importAfterCalls).toBe(1);
+  });
+});
+
+/**
+ * 能力单元：验证「一个 trait = 一个单元」的拆分是真的成立。
+ *
+ * 这些断言不看门面，直接打 `editor.events` / `editor.plugins` / `editor.serializer`，
+ * 确认门面只是转发、底层单元能独立工作、且两边共用同一份状态。
+ */
+describe("能力单元", () => {
+  it("editor.events 与门面共用同一条总线", () => {
+    const { editor } = createEditor();
+    const viaUnit: string[] = [];
+    const viaFacade: string[] = [];
+
+    // 单元上订阅，门面派发
+    editor.events.on("plugin:destroyed", ({ name }) => viaUnit.push(name));
+    editor.emit("plugin:destroyed", { name: "A" });
+
+    // 门面上订阅，单元派发
+    editor.on("plugin:destroyed", ({ name }) => viaFacade.push(name));
+    editor.events.emit("plugin:destroyed", { name: "B" });
+
+    expect(viaUnit).toEqual(["A", "B"]);
+    expect(viaFacade).toEqual(["B"]);
+  });
+
+  it("一个订阅者抛错不会打断同一事件上的其他订阅者", () => {
+    const { editor } = createEditor();
+    const seen: string[] = [];
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    editor.on("plugin:destroyed", () => {
+      throw new Error("boom");
+    });
+    editor.on("plugin:destroyed", ({ name }) => seen.push(name));
+
+    expect(() => editor.emit("plugin:destroyed", { name: "A" })).not.toThrow();
+    expect(seen).toEqual(["A"]);
+    expect(errors).toHaveBeenCalledOnce();
+
+    errors.mockRestore();
+  });
+
+  it("editor.plugins.hookPlugins 与 installedPlugins 同步", () => {
+    const { editor } = createEditor();
+    expect(editor.hookPlugins).toEqual([]);
+
+    editor.use(TestPlugin);
+
+    expect(editor.hookPlugins.map((plugin) => plugin.constructor.name)).toEqual(["TestPlugin"]);
+    expect(editor.hookPlugins).toHaveLength(editor.installedPlugins.length);
+  });
+
+  it("editor.serializer 可独立调用，行为与门面一致", async () => {
+    const { editor, canvas } = createEditor();
+    editor.use(HookPlugin);
+
+    // 单元直调 → 钩子照样串起来
+    const viaUnit = editor.serializer.exportJSON();
+    expect(JSON.parse(viaUnit)).toMatchObject({ exportedBy: "HookPlugin" });
+
+    // 门面转发 → 同一份逻辑
+    expect(JSON.parse(editor.exportJSON())).toMatchObject({ exportedBy: "HookPlugin" });
+
+    await editor.serializer.loadJSON(viaUnit);
+    expect(canvas.loadedJSON).toMatchObject({ migrated: true });
+  });
+
+  it("dispose 之后总线已清空，再派发不会触达旧订阅", () => {
+    const { editor } = createEditor();
+    const seen: string[] = [];
+    editor.events.on("object:added", (object) => seen.push(String(object)));
+
+    editor.dispose();
+
+    editor.emit("object:added", new Rect({ width: 10, height: 10 }));
+
+    expect(seen).toEqual([]);
   });
 });
