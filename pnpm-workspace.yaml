@@ -1,5 +1,7 @@
 allowBuilds:
-  canvas: set this to true or false
+  # node-canvas 是 fabric 的可选依赖，只在 Node 端渲染时需要。
+  # 本项目的单测用 src/test/MockCanvas.ts 替身，不需要它的原生编译产物。
+  canvas: false
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.1.0
   vite-plus: 1.1.0

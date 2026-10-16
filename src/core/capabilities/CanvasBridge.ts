@@ -2,6 +2,19 @@ import type { Canvas, CanvasEvents, FabricObject } from "fabric";
 import type { SelectionMode } from "../types";
 import type { EditorEvents } from "../contracts";
 
+/**
+ * 「变换过程中的帧」。
+ *
+ * fabric 把它们拆成了互相独立的事件，但对上层来说关注点只有一个：**这个对象正在变**。
+ * 所以这里合并成一路 `object:transforming`，订阅方不用关心用户具体是在拖还是在转。
+ */
+const TRANSFORM_EVENTS = [
+  "object:moving",
+  "object:scaling",
+  "object:rotating",
+  "object:skewing",
+] as const;
+
 export class CanvasBridge {
   private readonly disposers: Array<() => void> = [];
 
@@ -23,6 +36,14 @@ export class CanvasBridge {
     this.bindCanvasEvent("object:modified", ({ target }) => {
       if (target) this.events.emit("object:modified", target);
     });
+
+    // 「过程中的帧」：拖拽 / 缩放 / 旋转 / 斜切。和 object:modified 的区别是它每帧都发，
+    // 用途是让属性面板实时跟随，而不是等松手才刷新。
+    for (const eventName of TRANSFORM_EVENTS) {
+      this.bindCanvasEvent(eventName, ({ target }) => {
+        if (target) this.events.emit("object:transforming", target);
+      });
+    }
 
     this.bindCanvasEvent("selection:created", ({ selected }) => {
       this.emitSelection(selected);

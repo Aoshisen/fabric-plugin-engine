@@ -37,6 +37,15 @@ const emit = defineEmits<{
   disposed: [];
 }>();
 
+/**
+ * 自己再包一层宿主 div 是必须的。
+ *
+ * fabric 的 `Canvas` 会把传进来的 `<canvas>` **包进它自己建的 `.canvas-container`**，
+ * 变成「容器 div > lower canvas + upper canvas」。如果宿主组件的根节点就是这个 canvas，
+ * 组件卸载时 Vue 只会摘掉 canvas 本身，那个容器 div 会留在页面上 ——
+ * 路由来回切几次就攒下一堆空 div。套一层自己的 div 当根节点，卸载时整棵子树一起走，
+ * 所以这里连 ref 都不需要。
+ */
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const editor = shallowRef<Editor | null>(null);
 
@@ -68,13 +77,28 @@ defineExpose({ editor });
 </script>
 
 <template>
-  <canvas ref="canvasRef" :width="props.width" :height="props.height" class="editor-canvas" />
+  <div class="editor-host">
+    <canvas ref="canvasRef" :width="props.width" :height="props.height" class="editor-canvas" />
+  </div>
 </template>
 
 <style scoped>
+.editor-host {
+  display: flex;
+  justify-content: center;
+}
+
+/*
+ * 这里**故意不写** `max-width: 100%`。
+ *
+ * fabric 初始化时会把 `width` / `height` 写成 lower canvas、upper canvas
+ * 以及它自建的 `.canvas-container` 三处的行内样式。容器宽度被写死之后，
+ * 内层只加 `max-width` 只会把画面横向压扁（行内的高度还在），
+ * 变成非等比缩放 —— 看起来是渲染坏了，其实只是 CSS 打架。
+ * 所以画布保持 1:1，窄屏由外层舞台横向滚动，坐标也永远和面板上的数字对得上。
+ */
 .editor-canvas {
   display: block;
-  max-width: 100%;
   border-radius: 8px;
   box-shadow:
     0 1px 2px rgb(15 23 42 / 8%),

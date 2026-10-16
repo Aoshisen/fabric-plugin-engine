@@ -7,7 +7,9 @@ import type { FabricObjectProps } from "fabric";
  * 新增对象的标准流程：
  * 1. 在 `src/objects/` 下新建文件，定义类并写 `declare module "../core/types"`；
  * 2. 在 `src/objects/index.ts` 的 `registerCustomObjects()` 里加一行登记；
- * 3. 需要对外 API（例如 `editor.createXxx()`）时，再单独写一个插件。
+ * 3. 想让它出现在形状库里，只要在 `playground/shapeCatalog.ts` 补一条预设 ——
+ *    创建入口由 `playground/shapeActions.addShape()` 统一提供，**不要**再为它写一个
+ *    `createXxx` 插件（那种插件最终只是在转发 `registry.create()`，多一层没有收益）。
  */
 
 /** `MyCustomObject` 的自定义数据字段（参与序列化） */

@@ -82,6 +82,17 @@ export class MockCanvas {
     return true;
   }
 
+  /**
+   * 多选（真实 fabric 里是一个 ActiveSelection 对象）。
+   * 这里只保留对外可观察的那部分：`getActiveObjects()` 的结果 + 相应的事件。
+   */
+  setActiveObjects(objects: FabricObject[]): boolean {
+    const first = this.active.length === 0;
+    this.active = [...objects];
+    this.fire(first ? "selection:created" : "selection:updated", { selected: [...this.active] });
+    return true;
+  }
+
   /** 取消选中，派发 `selection:cleared` */
   discardActiveObject(): boolean {
     const previous = this.active;
@@ -92,6 +103,41 @@ export class MockCanvas {
 
   requestRenderAll(): void {
     // no-op：测试环境不需要真的重绘
+  }
+
+  /* ------------------------------ 图层顺序 ------------------------------ */
+  /* 这几个是 fabric 从 ObjectCollection 上透出来的，Canvas 不需要自己实现。
+     替身里如实照搬「命中就换位、没换成就返回 false」的语义，
+     插件层面的层级调整才测得准。 */
+
+  bringObjectToFront(object: FabricObject): boolean {
+    const index = this.objects.indexOf(object);
+    if (index < 0 || index === this.objects.length - 1) return false;
+    this.objects.splice(index, 1);
+    this.objects.push(object);
+    return true;
+  }
+
+  sendObjectToBack(object: FabricObject): boolean {
+    const index = this.objects.indexOf(object);
+    if (index <= 0) return false;
+    this.objects.splice(index, 1);
+    this.objects.unshift(object);
+    return true;
+  }
+
+  bringObjectForward(object: FabricObject): boolean {
+    const index = this.objects.indexOf(object);
+    if (index < 0 || index === this.objects.length - 1) return false;
+    [this.objects[index], this.objects[index + 1]] = [this.objects[index + 1], object];
+    return true;
+  }
+
+  sendObjectBackwards(object: FabricObject): boolean {
+    const index = this.objects.indexOf(object);
+    if (index <= 0) return false;
+    [this.objects[index - 1], this.objects[index]] = [object, this.objects[index - 1]];
+    return true;
   }
 
   toJSON(): Record<string, unknown> {

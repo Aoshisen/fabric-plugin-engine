@@ -2,6 +2,7 @@ import type { FabricObject } from "fabric";
 import { BasePlugin } from "./BasePlugin";
 import { useEditorStore } from "../stores";
 import type { EditorUIStore } from "../stores";
+import type { ObjectPropertiesSnapshot } from "./PropertyPlugin";
 import type { CoreEvents, PluginOptions, SelectionMode } from "../core/types";
 
 /** 插件配置 */
@@ -71,8 +72,19 @@ export default class EditorStorePlugin extends BasePlugin {
 
     this.listen("selection:changed", ({ mode, targets }) => this.syncSelection(mode, targets));
 
+    this.listen("properties:changed", ({ reason, snapshot }) =>
+      this.syncProperties(reason, snapshot),
+    );
+
     this.listen("plugin:installed", () => this.syncPlugins("plugin:installed"));
     this.listen("plugin:destroyed", () => this.syncPlugins("plugin:destroyed"));
+
+    // 3. 属性快照的来源是 `properties:changed`，它只在 `PropertyPlugin` 里发。
+    //    如果属性插件**先于**本插件装载，它装载时那次广播就没人接住了 ——
+    //    所以在装载时主动补读一次。能力不在就静默跳过，靠事件兜底。
+    if (this.editor.hasPlugin("PropertyPlugin")) {
+      this.syncProperties("init", this.editor.readSelectedProperties());
+    }
   }
 
   override destroy(): void {
@@ -133,6 +145,17 @@ export default class EditorStorePlugin extends BasePlugin {
   private syncSelection(mode: SelectionMode, targets: FabricObject[]): void {
     this.store.setSelection(mode, targets);
     this.commit("selection:changed");
+  }
+
+  /**
+   * 属性快照。
+   *
+   * 注意这里**不**自己去调 `toObject()`：谁读对象、读哪些字段是 `PropertyPlugin`
+   * 的职责，本插件只负责把收到的东西放进 store。
+   */
+  private syncProperties(reason: string, snapshot: ObjectPropertiesSnapshot | null): void {
+    this.store.setSelectedProperties(snapshot);
+    this.commit(reason);
   }
 
   private syncPlugins(reason: string): void {

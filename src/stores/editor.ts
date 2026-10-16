@@ -1,6 +1,7 @@
-import { computed, ref } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import { defineStore } from "pinia";
 import type { FabricObject } from "fabric";
+import { objectTypeName } from "../core/objectType";
 import type { SelectionMode } from "../core/types";
 
 /**
@@ -21,22 +22,9 @@ export interface SelectedObjectSummary {
   label: string;
 }
 
-/**
- * 取对象的类型名。
- *
- * 注意**不能**用实例上的 `object.type`：fabric v7 里那个是遗留的小写标识
- * （`rect` / `circle`，官方已标 deprecated），拿它做 UI 展示和判断都会出错。
- * 与 `static type` 一致、真正用于序列化的是**构造函数**上的 `type`：
- * `object.constructor.type` → `Rect` / `MyCustomObject`。
- */
-function typeNameOf(object: FabricObject): string {
-  const ctor = object.constructor as { type?: string };
-  return ctor.type || object.type || "Unknown";
-}
-
 /** 从 fabric 对象提取展示信息 */
 function toSummary(object: FabricObject, index: number): SelectedObjectSummary {
-  const type = typeNameOf(object);
+  const type = objectTypeName(object);
   const named = (object as unknown as { name?: unknown }).name;
   const name = typeof named === "string" ? named : "";
 
@@ -64,6 +52,16 @@ export const useEditorStore = defineStore("editor", () => {
   const lastEvent = ref<string | null>(null);
   /** 同步次数：组件想「每次同步都做点什么」时 watch 它一个就够了 */
   const syncCount = ref(0);
+  /**
+   * 选中对象的**序列化快照**（`toObject()` 的结果）。
+   *
+   * 用 `shallowRef` 是因为每次都是整体替换、从不原地改字段；
+   * 深响应式会让 Vue 去递归代理几十个嵌套字段（`points`、`styles` 数组），
+   * 拖动时每帧都白跑一遍，得不偿失。
+   */
+  const selectedValues = shallowRef<Record<string, unknown> | null>(null);
+  /** 快照对应的类型名，面板上做标题用 */
+  const selectedType = ref<string | null>(null);
 
   /* -------------------------------- getters ------------------------------- */
 
@@ -71,6 +69,8 @@ export const useEditorStore = defineStore("editor", () => {
   const hasSelection = computed(() => selectionMode.value !== "empty");
   const isSingleSelection = computed(() => selectionMode.value === "one");
   const isMultiSelection = computed(() => selectionMode.value === "multi");
+  /** 属性面板能不能编辑：必须恰好选中一个对象 */
+  const canEditProperties = computed(() => selectedValues.value !== null);
 
   /** 直接给 UI 用的选择描述文案 */
   const selectionLabel = computed(() => {
@@ -92,6 +92,18 @@ export const useEditorStore = defineStore("editor", () => {
     selected.value = mode === "empty" ? [] : targets.map(toSummary);
   }
 
+  /**
+   * 写入选中对象的属性快照。
+   *
+   * 传 `null` 表示「当前没有可编辑的对象」（未选中或多选），面板据此显示空状态。
+   */
+  function setSelectedProperties(
+    snapshot: { type: string; values: Record<string, unknown> } | null,
+  ): void {
+    selectedType.value = snapshot?.type ?? null;
+    selectedValues.value = snapshot?.values ?? null;
+  }
+
   function setPlugins(names: string[]): void {
     installedPlugins.value = [...names];
   }
@@ -109,6 +121,8 @@ export const useEditorStore = defineStore("editor", () => {
     selected.value = [];
     installedPlugins.value = [];
     lastEvent.value = null;
+    selectedValues.value = null;
+    selectedType.value = null;
   }
 
   return {
@@ -119,15 +133,19 @@ export const useEditorStore = defineStore("editor", () => {
     installedPlugins,
     lastEvent,
     syncCount,
+    selectedValues,
+    selectedType,
     // getters
     hasObjects,
     hasSelection,
     isSingleSelection,
     isMultiSelection,
+    canEditProperties,
     selectionLabel,
     // actions
     setObjectCount,
     setSelection,
+    setSelectedProperties,
     setPlugins,
     markEvent,
     reset,

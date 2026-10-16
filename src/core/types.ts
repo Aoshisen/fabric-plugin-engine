@@ -13,6 +13,14 @@ export interface CoreEvents {
   "object:added": FabricObject;
   "object:removed": FabricObject;
   "object:modified": FabricObject;
+  /**
+   * 拖拽 / 缩放 / 旋转 / 斜切**过程中**的实时帧。
+   *
+   * `object:modified` 只在松手后派发一次，属性面板靠它会出现「拖动时数字不动」的割裂感，
+   * 所以这里额外桥出一路高频事件。它由 fabric 自己的渲染帧驱动，
+   * 订阅方如果要做重活，请自行按帧合并（见 `PropertyPlugin`）。
+   */
+  "object:transforming": FabricObject;
 
   "selection:changed": { mode: SelectionMode; targets: FabricObject[] };
 }
@@ -29,8 +37,16 @@ export type RegisteredTypeName = Extract<keyof ObjectTypeMap, string>;
 
 export type RegisteredObject<K extends RegisteredTypeName> = ObjectTypeMap[K];
 
+/**
+ * 对象构造函数。
+ *
+ * 参数特意放宽成 `any[]`：fabric 这一族类的签名并不统一 ——
+ * `new Rect(options)` 是一个参数，`new Text(text, options)` 是两个。
+ * 用 `(options?: object) => T` 描述会把 `Text` / `Path` / `Line` 全挡在门外，
+ * 而注册表恰恰要能装下它们。
+ */
 // oxlint-disable-next-line no-explicit-any
-export type ObjectCtor<T = FabricObject> = new (options?: any) => T;
+export type ObjectCtor<T = FabricObject> = new (...args: any[]) => T;
 
 export type PluginOptions = Record<string, unknown>;
 
