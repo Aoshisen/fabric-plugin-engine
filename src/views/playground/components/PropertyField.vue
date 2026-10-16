@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { NColorPicker, NInput, NInputNumber, NSelect, NSlider, NSwitch } from "naive-ui";
 import type { SelectOption } from "naive-ui";
-import type { PropertyDescriptor } from "../../playground/types";
+import type { PropertyDescriptor } from "../types";
 
 /**
  * 单个属性字段。

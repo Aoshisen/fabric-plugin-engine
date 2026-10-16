@@ -1,5 +1,5 @@
 import type { FabricObject } from "fabric";
-import type { Editor } from "../core";
+import type { Editor } from "../../core";
 import { SHAPE_PRESETS, findShapePreset } from "./shapeCatalog";
 import type { ShapePreset } from "./shapeCatalog";
 
@@ -23,8 +23,8 @@ import type { ShapePreset } from "./shapeCatalog";
  * ## 用法
  *
  * ```ts
- * import { registerCustomObjects } from "../objects";
- * import { addShape, removeSelected, arrangeSelected } from "../playground/shapeActions";
+ * import { registerCustomObjects } from "../../objects";
+ * import { addShape, removeSelected, arrangeSelected } from "./shapeActions";
  *
  * // 编辑器就绪时登记一次，否则 registry.create() 找不到自定义类型
  * registerCustomObjects(editor.registry);

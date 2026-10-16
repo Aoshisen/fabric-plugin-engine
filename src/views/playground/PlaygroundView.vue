@@ -2,22 +2,23 @@
 import { computed, shallowRef } from "vue";
 import { storeToRefs } from "pinia";
 import { NButton, NButtonGroup } from "naive-ui";
-import EditorCanvas from "../components/EditorCanvas.vue";
-import PropertyPanel from "../components/PropertyPanel.vue";
-import ShapePalette from "../components/ShapePalette.vue";
-import { registerCustomObjects } from "../objects";
-import EditorStorePlugin from "../plugins/EditorStorePlugin";
-import PropertyPlugin from "../plugins/PropertyPlugin";
+// 只有 `EditorCanvas` 是两页共用的，留在 src/components；其余全部来自本目录。
+import EditorCanvas from "../../components/EditorCanvas.vue";
+import { registerCustomObjects } from "../../objects";
+import EditorStorePlugin from "../../plugins/EditorStorePlugin";
+import PropertyPlugin from "../../plugins/PropertyPlugin";
+import { useEditorStore } from "../../stores";
+import type { Editor, PluginUse } from "../../core";
+import PropertyPanel from "./components/PropertyPanel.vue";
+import ShapePalette from "./components/ShapePalette.vue";
 import {
   addShape,
   arrangeSelected,
   availableShapes,
   clearCanvas,
   removeSelected,
-} from "../playground/shapeActions";
-import type { ArrangeAction } from "../playground/shapeActions";
-import { useEditorStore } from "../stores";
-import type { Editor, PluginUse } from "../core";
+} from "./shapeActions";
+import type { ArrangeAction } from "./shapeActions";
 
 /**
  * Playground：加图形 → 选中 → 在右侧改属性。
@@ -26,7 +27,7 @@ import type { Editor, PluginUse } from "../core";
  * 1. 登记插件（能力清单一眼可见）；
  * 2. 把 UI 上的动作翻译成编辑器调用。
  *
- * 画布上的图形操作来自 `playground/shapeActions` —— **一组普通函数，不是插件**。
+ * 画布上的图形操作来自同目录的 `./shapeActions` —— **一组普通函数，不是插件**。
  * 它们无状态、不订阅事件，做成插件只是给函数套了层壳。真正需要留在插件层的是
  * `PropertyPlugin`：它持有状态、订阅事件、对外广播。
  *

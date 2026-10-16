@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
 import DemoView from "../views/DemoView.vue";
-import PlaygroundView from "../views/PlaygroundView.vue";
+import PlaygroundView from "../views/playground/PlaygroundView.vue";
 
 /**
  * 两个页面各有明确分工：

@@ -2,10 +2,10 @@
 import { computed, ref } from "vue";
 import { NEmpty, NTag } from "naive-ui";
 import { storeToRefs } from "pinia";
-import { describeObjectProperties } from "../playground/propertySchema";
-import { groupProperties } from "../playground/types";
-import { useEditorStore } from "../stores";
-import PropertyField from "./property/PropertyField.vue";
+import { useEditorStore } from "../../../stores";
+import { describeObjectProperties } from "../propertySchema";
+import { groupProperties } from "../types";
+import PropertyField from "./PropertyField.vue";
 
 /**
  * 属性面板。

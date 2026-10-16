@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { NButton } from "naive-ui";
-import { SHAPE_CATEGORIES } from "../playground/shapeCatalog";
-import type { ShapePreset } from "../playground/shapeCatalog";
+import { SHAPE_CATEGORIES } from "../shapeCatalog";
+import type { ShapePreset } from "../shapeCatalog";
 
 /**
  * 形状库面板。
  *
  * 这一层**不包含任何图形知识**：有哪些图形、怎么分组，全从 props 里来
  * （上游从 `shapeActions.availableShapes()` 取）。所以想加图形只改
- * `playground/shapeCatalog.ts`，登记了类型它自己就冒出来，没登记的不会显示。
+ * `../shapeCatalog.ts`，登记了类型它自己就冒出来，没登记的不会显示。
  */
 const props = defineProps<{ shapes: ShapePreset[] }>();
 

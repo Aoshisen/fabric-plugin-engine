@@ -1,9 +1,9 @@
 import type { FabricObject, Path } from "fabric";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { Editor } from "../core/Editor";
-import { objectTypeName } from "../core/objectType";
-import { registerCustomObjects } from "../objects";
-import { asCanvas, MockCanvas } from "../test/MockCanvas";
+import { Editor } from "../../core/Editor";
+import { objectTypeName } from "../../core/objectType";
+import { registerCustomObjects } from "../../objects";
+import { asCanvas, MockCanvas } from "../../test/MockCanvas";
 import {
   addShape,
   arrangeSelected,

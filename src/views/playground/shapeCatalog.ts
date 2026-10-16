@@ -2,7 +2,7 @@
  * 默认图形目录。
  *
  * 这是**纯数据**：只描述「有哪些图形、名字叫什么、创建时给什么参数」，
- * 不碰 canvas、不碰 Editor。`playground/shapeActions` 读它来造对象，
+ * 不碰 canvas、不碰 Editor。同目录的 `shapeActions` 读它来造对象，
  * 形状库面板读它来渲染按钮 —— 两边拿到的是同一份清单，加一个图形只要在这里补一条。
  *
  * `defaults` 里的字段直接交给 `registry.create()`。注意三个「主参数」：
